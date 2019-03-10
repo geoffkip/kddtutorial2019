@@ -76,8 +76,8 @@ cl.start_clipper()
 cl.register_application(name= 'kddtutorial', input_type= "doubles", default_output= "1.0", slo_micros= 100000)
 
 python_deployer.deploy_python_closure(cl, name='gb-model', version=1,
-     input_type= "doubles", func=predict, pkgs_to_install=['scikit-learn'],
-     num_replicas=1, batch_size=1)
+     input_type= "doubles", func=predict, pkgs_to_install=['numpy','scipy','scikit-learn'],
+     registry= 'docker.io/gkip')
 
 cl.link_model_to_app(app_name = 'kddtutorial', model_name = 'gb-model')
 
