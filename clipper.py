@@ -5,6 +5,7 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import GradientBoostingClassifier
 import logging
+from sklearn.preprocessing import MultiLabelBinarizer
 from clipper_admin import ClipperConnection, KubernetesContainerManager
 from clipper_admin.deployers import python as python_deployer
 import requests, json
@@ -57,14 +58,37 @@ def train_model():
     #fit model
     model =  GradientBoostingClassifier()
     model.fit(X_train, Y_train)
-    return model
-    
+    model_columns=list(X_train.columns)
+    return model, model_columns
+
+def process_features(raw_data):
+    features = pd.pivot_table(pd.DataFrame(raw_data).reset_index(),values="features",columns="index").infer_objects()
+    return features 
+      
 def predict(data):
-    model = train_model()
-    return model.predict(data)
-    
+    clean_data = process_features(data)
+    model, model_columns = train_model()
+    clean_data = clean_data[model_columns]
+    return model.predict(clean_data)
+
 #create test data
-test_data = np.array([0,0,1,67,70,1.01,1,0,102,48,3.20,137,5,11.90]).reshape(1,14)
+test_data= {
+     "features": {
+        'htn_Unknown': 0,
+        'htn_no' : 0,
+        'htn_yes': 1,
+        'age' : 67,
+        'bp': 70,
+        'sg' : 1.01,
+        'al': 1,
+        'su': 0,
+        'bgr': 102 ,
+        'bu': 48,
+        'sc': 3.20,
+        'sod': 137,
+        'pot': 5,
+        'hemo':11.90}
+    }
 
 ### CLIPPER PART
 
@@ -76,8 +100,11 @@ cl.start_clipper()
 cl.register_application(name= 'kddtutorial', input_type= "doubles", default_output= "1.0", slo_micros= 100000)
 
 python_deployer.deploy_python_closure(cl, name='gb-model', version=1,
-     input_type= "doubles", func=predict, pkgs_to_install=['numpy','scipy','scikit-learn'],
-     registry= 'docker.io/gkip')
+     input_type= "doubles", func=predict, 
+     pkgs_to_install=['numpy','pandas','scipy','scikit-learn'],
+     registry= "gkip")
+
+
 
 cl.link_model_to_app(app_name = 'kddtutorial', model_name = 'gb-model')
 
@@ -88,15 +115,12 @@ addr = cl.get_query_addr()
 response = requests.post(
      "http://%s/%s/predict" % (addr, 'kddtutorial'),
      headers={"Content-type": "application/json"},
-     data=json.dumps({
-         'input': test_data
-     }))
+     data=json.dumps(test_data),verify=False)
 result = response.json()
 if response.status_code == requests.codes.ok and result["default"]:
      print('A default prediction was returned.')
 elif response.status_code != requests.codes.ok:
     print(result)
-    raise BenchmarkException(response.text)
 else:
     print('Prediction Returned:', result)
 
