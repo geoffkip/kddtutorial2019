@@ -25,11 +25,12 @@ model = GradientBoostingClassifier(random_state=2019)
 model.fit(X, y)
 
 # First we need to import Clipper
-from clipper_admin import ClipperConnection, DockerContainerManager
+from clipper_admin import ClipperConnection, KubernetesContainerManager
 from clipper_admin.deployers.python import deploy_python_closure
 
 # Create a Clipper connection
-clipper_conn = ClipperConnection(DockerContainerManager())
+clipper_conn = ClipperConnection(KubernetesContainerManager(useInternalIP=True,
+                              kubernetes_proxy_addr="127.0.0.1:8080"))
 
 # Start a Clipper cluster or connect to a running one
 clipper_conn.start_clipper()
@@ -50,14 +51,16 @@ model = model
 # Deploy the 'predict' function as a model
 deploy_python_closure(clipper_conn, name="gb-model",
                       version=1, input_type="doubles", func=predict,
-                      pkgs_to_install=['scikit-learn','pandas','numpy','scipy'])
+                      pkgs_to_install=['scikit-learn','pandas','numpy','scipy'],
+                      registry= "gkip")
 
 # Routes requests for the application 'kddtutorial' to the model 'gb-model'
 clipper_conn.link_model_to_app(app_name="kddtutorial", model_name="gb-model")
 
 inputs = X.loc[200, X.columns != 'classification'] # use random data point
 headers = {"Content-type": "application/json"}
-response =requests.post("http://localhost:1337/kddtutorial/predict", headers=headers,
+addr = clipper_conn.get_query_addr()
+response =requests.post("http://%s/%s/predict" % (addr, 'kddtutorial'), headers=headers,
               data=json.dumps({"input": list(inputs)})).json()
 
 clipper_conn.stop_all()
