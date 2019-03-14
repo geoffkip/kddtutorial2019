@@ -62,5 +62,6 @@ headers = {"Content-type": "application/json"}
 addr = clipper_conn.get_query_addr()
 response =requests.post("http://%s/%s/predict" % (addr, 'kddtutorial'), headers=headers,
               data=json.dumps({"input": list(inputs)})).json()
+print(response)
 
 clipper_conn.stop_all()
