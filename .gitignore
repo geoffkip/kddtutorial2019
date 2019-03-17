@@ -1,2 +1,3 @@
+*.mov
 *.pyc
 flask/kidney_disease.csv
