@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ckd-web
+spec:
+  type: NodePort
+  selector:
+    app: ckd
+    tier: web
+  ports:
+  - name: web
+    protocol: TCP
+    port: 5000
+    targetPort: 5000
+    nodePort: 30502
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: ckd-ml-engine
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ckd
+        tier: web
+    spec:
+      hostname: web
+      restartPolicy: Always
+      containers:
+      - name: web
+        # Use the local ckd image
+        image: ckd:latest
+        imagePullPolicy: Never
+        ports:
+        - name: web
+          containerPort: 5000
